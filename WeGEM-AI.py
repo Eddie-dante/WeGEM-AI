@@ -1,347 +1,195 @@
 """
-DEEPSEEK MINI AI - Single File Version
-A lightweight AI assistant powered by DeepSeek API
-GitHub Ready - Just clone and run!
-
-Author: Your Name
-License: MIT
+DEEPSEEK CHAT - Single File AI Assistant
+Just run it and start chatting!
 """
 
 import requests
-import json
 import os
-import sys
+import json
 from datetime import datetime
-from typing import Optional, Dict, List
 
-# ============================================================================
-# CONFIGURATION
-# ============================================================================
+# ============================================
+# CONFIGURATION - CHANGE THIS
+# ============================================
 
-DEFAULT_MODEL = "deepseek-chat"
-API_URL = "https://api.deepseek.com/v1/chat/completions"
+# Option 1: Put your API key here (easiest)
+YOUR_API_KEY = "YOUR_API_KEY_HERE"  # <-- PASTE YOUR DEEPSEEK API KEY HERE
 
-# ============================================================================
+# Option 2: Or set it in environment variable (more secure)
+# export DEEPSEEK_API_KEY="sk-d7dae703a0ee45ff947e2b18d43044a4"
+
+# ============================================
 # MAIN AI CLASS
-# ============================================================================
+# ============================================
 
-class DeepSeekMiniAI:
-    """
-    A simple yet powerful AI assistant using DeepSeek's API
-    """
-    
-    def __init__(self, api_key: Optional[str] = None):
-        """
-        Initialize the DeepSeek AI
+class DeepSeekChat:
+    def __init__(self, api_key=None):
+        """Initialize with your API key"""
+        self.api_key = api_key or YOUR_API_KEY or os.getenv("sk-d7dae703a0ee45ff947e2b18d43044a4")
         
-        Args:
-            api_key: Your DeepSeek API key. If None, checks environment variable.
-        """
-        # Get API key from parameter or environment variable
-        self.api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
+        if self.api_key == "sk-d7dae703a0ee45ff947e2b18d43044a4" or not self.api_key:
+            print("\n" + "="*50)
+            print("🔑 NEED DEEPSEEK API KEY")
+            print("="*50)
+            print("\n1. Get your free key at: https://platform.deepseek.com/")
+            print("2. Edit this file and paste it where it says YOUR_API_KEY_HERE")
+            print("\nOr run with:")
+            print("   python deepseek_chat.py YOUR_API_KEY_HERE")
+            print("="*50)
+            exit()
         
-        if not self.api_key:
-            print("\n" + "="*60)
-            print("🔑 DEEPSEEK API KEY REQUIRED")
-            print("="*60)
-            print("\nPlease get your API key from: https://platform.deepseek.com/")
-            print("\nThen you can either:")
-            print("1. Set it as environment variable: export DEEPSEEK_API_KEY='your-key'")
-            print("2. Pass it directly when creating the AI")
-            print("3. Enter it now (will be used for this session only)\n")
-            
-            self.api_key = input("Enter your DeepSeek API key: ").strip()
-            
-            if not self.api_key:
-                raise ValueError("API key is required to use DeepSeek Mini AI")
-        
-        self.model = DEFAULT_MODEL
-        self.conversation_history: List[Dict] = [
-            {"role": "system", "content": "You are a helpful, friendly AI assistant named DeepSeek Mini."}
+        self.api_url = "https://api.deepseek.com/v1/chat/completions"
+        self.messages = [
+            {"role": "system", "content": "You are a helpful AI assistant. Be concise and friendly."}
         ]
-        print("\n✅ DeepSeek Mini AI initialized successfully!")
+        print("\n✅ DeepSeek AI Ready! Type /help for commands\n")
+    
+    def ask(self, question):
+        """Ask the AI a question"""
+        self.messages.append({"role": "user", "content": question})
         
-    def chat(self, message: str, temperature: float = 0.7) -> str:
-        """
-        Send a message to DeepSeek and get response
-        
-        Args:
-            message: Your message to the AI
-            temperature: Creativity level (0.0 = focused, 1.0 = creative)
-            
-        Returns:
-            AI's response as string
-        """
         try:
-            # Add user message to history
-            self.conversation_history.append({"role": "user", "content": message})
-            
-            # Prepare API request
-            headers = {
-                "Content-Type": "application/json",
-                "Authorization": f"Bearer {self.api_key}"
-            }
-            
-            payload = {
-                "model": self.model,
-                "messages": self.conversation_history,
-                "temperature": temperature,
-                "max_tokens": 2000
-            }
-            
-            # Make API call
-            print("🤔 Thinking...", end="\r")
             response = requests.post(
-                API_URL,
-                headers=headers,
-                json=payload,
+                self.api_url,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": "deepseek-chat",
+                    "messages": self.messages,
+                    "temperature": 0.7
+                },
                 timeout=30
             )
-            print(" " * 20, end="\r")  # Clear "Thinking..." line
             
-            # Handle response
             if response.status_code == 200:
-                result = response.json()
-                ai_response = result['choices'][0]['message']['content']
-                
-                # Add to history
-                self.conversation_history.append(
-                    {"role": "assistant", "content": ai_response}
-                )
-                
-                return ai_response
+                answer = response.json()['choices'][0]['message']['content']
+                self.messages.append({"role": "assistant", "content": answer})
+                return answer
             else:
                 return f"❌ Error {response.status_code}: {response.text}"
                 
-        except requests.exceptions.Timeout:
-            return "❌ Request timed out. Please try again."
-        except requests.exceptions.ConnectionError:
-            return "❌ Connection error. Check your internet."
         except Exception as e:
-            return f"❌ Unexpected error: {str(e)}"
+            return f"❌ Error: {str(e)}"
     
-    def reset(self):
+    def clear(self):
         """Clear conversation history"""
-        self.conversation_history = [
-            {"role": "system", "content": "You are a helpful, friendly AI assistant named DeepSeek Mini."}
+        self.messages = [
+            {"role": "system", "content": "You are a helpful AI assistant. Be concise and friendly."}
         ]
-        return "🔄 Conversation reset!"
+        return "🔄 Conversation cleared!"
     
-    def save(self, filename: Optional[str] = None) -> str:
+    def save(self):
         """Save conversation to file"""
-        if not filename:
-            filename = f"deepseek_chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
-        
-        try:
-            with open(filename, 'w') as f:
-                json.dump(self.conversation_history, f, indent=2)
-            return f"💾 Conversation saved to {filename}"
-        except Exception as e:
-            return f"❌ Failed to save: {str(e)}"
-    
-    def stats(self) -> Dict:
-        """Get conversation statistics"""
-        return {
-            "messages": len(self.conversation_history) - 1,  # Excluding system prompt
-            "user": sum(1 for m in self.conversation_history if m["role"] == "user"),
-            "assistant": sum(1 for m in self.conversation_history if m["role"] == "assistant"),
-            "model": self.model
-        }
+        filename = f"chat_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+        with open(filename, 'w') as f:
+            json.dump(self.messages, f, indent=2)
+        return f"💾 Saved to {filename}"
 
-# ============================================================================
-# COMMAND-LINE INTERFACE
-# ============================================================================
-
-def print_banner():
-    """Print welcome banner"""
-    banner = """
-╔══════════════════════════════════════════════╗
-║     🚀 DEEPSEEK MINI AI - Single File        ║
-║     Powered by DeepSeek API                   ║
-╚══════════════════════════════════════════════╝
-    """
-    print(banner)
-
-def print_help():
-    """Print help menu"""
-    help_text = """
-📋 COMMANDS:
-────────────
-/quit  - Exit the program
-/exit  - Same as /quit
-/clear - Clear conversation history
-/reset - Same as /clear
-/save  - Save conversation to file
-/stats - Show conversation statistics
-/help  - Show this menu
-
-💡 TIPS:
-────────
-• Just type anything to chat with the AI
-• The AI remembers the whole conversation
-• Your API key is never saved to disk
-• All conversations are private
-
-🎯 EXAMPLE:
-───────────
-You: What is artificial intelligence?
-AI: Artificial intelligence (AI) is the simulation of...
-    """
-    print(help_text)
+# ============================================
+# INTERACTIVE CHAT
+# ============================================
 
 def main():
-    """Main function to run the AI"""
-    print_banner()
+    """Start interactive chat"""
+    print("="*50)
+    print("🚀 DEEPSEEK AI CHAT - Single File Version")
+    print("="*50)
     
-    # Initialize AI
-    try:
-        ai = DeepSeekMiniAI()
-    except ValueError as e:
-        print(f"\n❌ {e}")
-        sys.exit(1)
-    except KeyboardInterrupt:
-        print("\n\n👋 Goodbye!")
-        sys.exit(0)
+    # Get API key from command line if provided
+    import sys
+    api_key = sys.argv[1] if len(sys.argv) > 1 else None
     
-    print("\nType /help for commands, or just start chatting!\n")
+    # Create AI instance
+    ai = DeepSeekChat(api_key)
     
-    # Main chat loop
+    # Show commands
+    print("\nCommands: /clear, /save, /help, /quit")
+    
     while True:
         try:
             # Get user input
-            user_input = input("\n👤 You: ").strip()
+            user = input("\n👤 You: ").strip()
             
-            if not user_input:
+            if not user:
                 continue
             
             # Handle commands
-            cmd = user_input.lower()
-            
-            if cmd in ['/quit', '/exit']:
-                print("\n👋 Thank you for using DeepSeek Mini AI! Goodbye!")
+            if user.lower() == '/quit':
+                print("\n👋 Goodbye!")
                 break
-                
-            elif cmd in ['/clear', '/reset']:
-                print(ai.reset())
+            elif user.lower() == '/clear':
+                print(ai.clear())
                 continue
-                
-            elif cmd == '/save':
+            elif user.lower() == '/save':
                 print(ai.save())
                 continue
-                
-            elif cmd == '/stats':
-                stats = ai.stats()
-                print("\n📊 STATISTICS:")
-                print(f"  Total messages: {stats['messages']}")
-                print(f"  You: {stats['user']}")
-                print(f"  AI: {stats['assistant']}")
-                print(f"  Model: {stats['model']}")
-                continue
-                
-            elif cmd == '/help':
-                print_help()
+            elif user.lower() == '/help':
+                print("\n📋 COMMANDS:")
+                print("  /quit  - Exit")
+                print("  /clear - Reset conversation")
+                print("  /save  - Save to file")
+                print("  /help  - Show this menu")
                 continue
             
             # Get AI response
-            response = ai.chat(user_input)
-            print(f"\n🤖 AI: {response}")
+            print("🤖 AI: ", end="", flush=True)
+            response = ai.ask(user)
+            print(response)
             
         except KeyboardInterrupt:
             print("\n\n👋 Goodbye!")
             break
         except Exception as e:
-            print(f"\n❌ Error: {e}")
+            print(f"❌ Error: {e}")
 
-# ============================================================================
-# SIMPLE ONE-FUNCTION VERSION
-# ============================================================================
+# ============================================
+# SIMPLE FUNCTION (Just 10 lines!)
+# ============================================
 
-def quick_chat(api_key: Optional[str] = None):
-    """
-    Ultra-simple chat function - just 20 lines!
-    
-    Args:
-        api_key: Your DeepSeek API key
-    """
-    api_key = api_key or os.getenv("DEEPSEEK_API_KEY")
-    
-    if not api_key:
-        print("❌ Please set DEEPSEEK_API_KEY environment variable")
-        return
-    
-    headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-    messages = [{"role": "system", "content": "You are a helpful assistant."}]
-    
-    print("\n🤖 Quick DeepSeek Chat (type 'quit' to exit)\n")
+def quick_chat(api_key):
+    """Super simple chat function"""
+    messages = [{"role": "system", "content": "You are helpful."}]
     
     while True:
-        user = input("You: ").strip()
-        if user.lower() == 'quit':
-            break
-            
+        user = input("\nYou: ")
+        if user == 'quit': break
+        
         messages.append({"role": "user", "content": user})
         
-        try:
-            response = requests.post(API_URL, headers=headers, 
-                                   json={"model": DEFAULT_MODEL, "messages": messages})
-            
-            if response.status_code == 200:
-                reply = response.json()['choices'][0]['message']['content']
-                print(f"AI: {reply}\n")
-                messages.append({"role": "assistant", "content": reply})
-            else:
-                print(f"Error: {response.status_code}\n")
-        except Exception as e:
-            print(f"Error: {e}\n")
+        r = requests.post(
+            "https://api.deepseek.com/v1/chat/completions",
+            headers={"Authorization": f"Bearer {api_key}"},
+            json={"model": "deepseek-chat", "messages": messages}
+        )
+        
+        reply = r.json()['choices'][0]['message']['content']
+        print(f"AI: {reply}")
+        messages.append({"role": "assistant", "content": reply})
 
-# ============================================================================
-# TEST FUNCTION
-# ============================================================================
+# ============================================
+# RUN IT
+# ============================================
 
-def test_ai():
-    """Simple test to verify everything works"""
-    print("🧪 Running test...")
-    
+if __name__ == "__main__":
     # Check if requests is installed
     try:
         import requests
-        print("✅ requests library found")
     except ImportError:
-        print("❌ Please install requests: pip install requests")
-        return False
+        print("\n📦 Installing requests library...")
+        os.system("pip install requests")
+        import requests
     
-    # Check Python version
-    if sys.version_info >= (3, 6):
-        print(f"✅ Python {sys.version_info.major}.{sys.version_info.minor} (3.6+ required)")
-    else:
-        print("❌ Python 3.6+ required")
-        return False
+    # Ask which mode
+    print("\nChoose mode:")
+    print("1. Full Chat (with memory & commands)")
+    print("2. Quick Chat (simple & fast)")
     
-    print("\n✅ All tests passed! Ready to run.")
-    return True
-
-# ============================================================================
-# ENTRY POINT
-# ============================================================================
-
-if __name__ == "__main__":
-    # Run test first
-    if not test_ai():
-        sys.exit(1)
-    
-    # Ask user which version to run
-    print("\n" + "="*50)
-    print("CHOOSE YOUR INTERFACE:")
-    print("="*50)
-    print("1. 🎯 Full AI Assistant (with memory, commands, saves)")
-    print("2. ⚡ Quick Chat (simple, no frills)")
-    print("3. 🧪 Just test installation")
-    
-    choice = input("\nEnter choice (1-3): ").strip()
+    choice = input("Enter 1 or 2: ").strip()
     
     if choice == "2":
-        quick_chat()
-    elif choice == "3":
-        print("\n✅ Installation looks good!")
+        api_key = YOUR_API_KEY or input("\nEnter your API key: ")
+        quick_chat(api_key)
     else:
         main()
